@@ -35,18 +35,17 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
-    private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
     private var shouldShowCamera: MutableState<Boolean> = mutableStateOf(false)
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            Log.i("kilo", "Permission granted")
+            Log.i("kilo", "Разрешение получено")
             shouldShowCamera.value = true
 
         } else {
-            Log.i("kilo", "Permission denied")
+            Log.i("kilo", "Разрешение не получено")
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,14 +66,14 @@ class MainActivity : ComponentActivity() {
                 this,
                 android.Manifest.permission.CAMERA
             ) == PackageManager.PERMISSION_GRANTED -> {
-                Log.i("kilo", "Permission previously granted")
+                Log.i("kilo", "Разрешение предоставлено ранее")
                 shouldShowCamera.value = true
             }
 
             ActivityCompat.shouldShowRequestPermissionRationale(
                 this,
                 android.Manifest.permission.CAMERA
-            ) -> Log.i("kilo", "Show camera permissions dialog")
+            ) -> Log.i("kilo", "Показать диалог разрешений камеры")
 
             else -> requestPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
