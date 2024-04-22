@@ -11,12 +11,10 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 
 class ObjectDetectionActivity: AppCompatActivity(){
     fun useDefaultObjectDetector() {
-
         val localModel =
             LocalModel.Builder()
                 .setAssetFilePath("asset_file_path_to_tflite_model")
                 .build()
-
         val options =
             CustomObjectDetectorOptions.Builder(localModel)
                 .setDetectorMode(CustomObjectDetectorOptions.SINGLE_IMAGE_MODE)

@@ -56,7 +56,6 @@ class MainActivity : ComponentActivity() {
 
             }
         }
-
         requestCameraPermission()
         cameraExecutor = Executors.newSingleThreadExecutor()
     }

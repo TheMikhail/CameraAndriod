@@ -77,5 +77,4 @@ fun CameraView() {
     Box(contentAlignment = Alignment.BottomCenter, modifier = Modifier.fillMaxSize()) {
         AndroidView({ previewView }, modifier = Modifier.fillMaxSize())
     }
-
 }
