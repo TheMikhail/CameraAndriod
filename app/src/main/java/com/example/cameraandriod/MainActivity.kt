@@ -37,10 +37,7 @@ import java.util.concurrent.Executors
 class MainActivity : ComponentActivity() {
     private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
-
     private var shouldShowCamera: MutableState<Boolean> = mutableStateOf(false)
-
-
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -62,12 +59,8 @@ class MainActivity : ComponentActivity() {
         }
 
         requestCameraPermission()
-        //ObjectDetectionActivity().useDefaultObjectDetector()
-        outputDirectory = getOutputDirectory()
         cameraExecutor = Executors.newSingleThreadExecutor()
     }
-
-
     private fun requestCameraPermission() {
         when {
             ContextCompat.checkSelfPermission(
@@ -86,24 +79,8 @@ class MainActivity : ComponentActivity() {
             else -> requestPermissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
     }
-
-    private fun handleImageCapture(uri: Uri) {
-        Log.i("kilo", "Image captured: $uri")
-        shouldShowCamera.value = false
-    }
-
-    private fun getOutputDirectory(): File {
-        val mediaDir = externalMediaDirs.firstOrNull()?.let {
-            File(it, resources.getString(R.string.app_name)).apply { mkdirs() }
-        }
-
-        return if (mediaDir != null && mediaDir.exists()) mediaDir else filesDir
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
     }
-
-
 }

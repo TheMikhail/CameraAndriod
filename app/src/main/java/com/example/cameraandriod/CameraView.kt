@@ -51,8 +51,7 @@ private suspend fun Context.getCameraProvider(): ProcessCameraProvider = suspend
     }
 }
 @Composable
-fun CameraView(
-) {
+fun CameraView() {
     // 1
     val lensFacing = CameraSelector.LENS_FACING_BACK
     val context = LocalContext.current
@@ -72,12 +71,11 @@ fun CameraView(
             cameraSelector,
             preview,
         )
-
         preview.setSurfaceProvider(previewView.surfaceProvider)
     }
-
     // 3
     Box(contentAlignment = Alignment.BottomCenter, modifier = Modifier.fillMaxSize()) {
         AndroidView({ previewView }, modifier = Modifier.fillMaxSize())
     }
+
 }
