@@ -51,7 +51,7 @@ android {
 
 dependencies {
     implementation("com.google.mlkit:object-detection-custom:17.0.1")
-    val camerax_version = "1.0.1"
+    val camerax_version = "1.2.2"
     implementation("androidx.camera:camera-camera2:$camerax_version")
     implementation("androidx.camera:camera-lifecycle:$camerax_version")
     implementation("androidx.camera:camera-view:1.0.0-alpha27")

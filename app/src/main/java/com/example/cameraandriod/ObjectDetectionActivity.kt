@@ -26,7 +26,7 @@ class ObjectDetectionActivity: AppCompatActivity(){
                 .setMaxPerObjectLabelCount(3)
                 .build()
         // [END create_custom_options]
-        val image = InputImage.fromBitmap(
+         val image = InputImage.fromBitmap(
             Bitmap.createBitmap(IntArray(100 * 100), 100, 100, Bitmap.Config.ARGB_8888),
             0)
         val objectDetector = ObjectDetection.getClient(options)
