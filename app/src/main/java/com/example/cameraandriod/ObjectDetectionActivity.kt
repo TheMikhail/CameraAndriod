@@ -10,7 +10,7 @@ import com.google.mlkit.vision.objects.custom.CustomObjectDetectorOptions
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 
 class ObjectDetectionActivity: AppCompatActivity(){
-    fun useDefaultObjectDetector() {
+    /*fun useDefaultObjectDetector() {
         val localModel =
             LocalModel.Builder()
                 .setAssetFilePath("asset_file_path_to_tflite_model")
@@ -50,7 +50,7 @@ class ObjectDetectionActivity: AppCompatActivity(){
                 val confidence = label.confidence
             }
         }
-    }
+    }*/
 }
 
 

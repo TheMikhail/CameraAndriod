@@ -8,6 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
+       // applicationId = "com.google.mlkit.vision.demo"
         applicationId = "com.example.cameraandriod"
         minSdk = 24
         targetSdk = 33
@@ -51,20 +52,21 @@ android {
 
 dependencies {
     implementation("com.google.mlkit:object-detection-custom:17.0.1")
-    val camerax_version = "1.2.2"
+    implementation("com.google.firebase:protolite-well-known-types:18.0.0")
+    val camerax_version = "1.3.3"
     implementation("androidx.camera:camera-camera2:$camerax_version")
     implementation("androidx.camera:camera-lifecycle:$camerax_version")
-    implementation("androidx.camera:camera-view:1.0.0-alpha27")
-
+    implementation("androidx.camera:camera-view:1.4.0-alpha05")
+    implementation("com.google.mlkit:pose-detection:18.0.0-beta4")
 // Icons
-    val compose_version = "1.6.5"
+    val compose_version = "1.6.6"
     implementation("androidx.compose.material:material-icons-extended:$compose_version")
 
     implementation("com.google.mlkit:object-detection:17.0.1")
 
-    implementation("androidx.core:core-ktx:1.9.0")
+    implementation("androidx.core:core-ktx:1.13.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.activity:activity-compose:1.9.0")
     implementation(platform("androidx.compose:compose-bom:2023.03.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
