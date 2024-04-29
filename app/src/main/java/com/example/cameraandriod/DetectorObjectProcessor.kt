@@ -1,11 +1,13 @@
 package com.example.cameraandriod
 
 import android.annotation.SuppressLint
+import android.content.ContentValues.TAG
 import android.util.Log
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageProxy
 import com.google.android.gms.tasks.TaskExecutors
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.custom.CustomObjectDetectorOptions
@@ -31,10 +33,12 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
             detector.close()
         }
         @SuppressLint("UnsafeExperimentalUsageError")
-        fun processImageProxy(image: ImageProxy, onDetectionFinished: (ObjectDetection) -> Unit){
+        fun processImageProxy(image: ImageProxy, onDetectionFinished: (List<DetectedObject>) -> Unit){
             image.image ?: return
             detector.process(InputImage.fromMediaImage(image.image!!, image.imageInfo.rotationDegrees))
-                //.addOnSuccessListener(executor) { results: ObjectDetection -> onDetectionFinished(results) }
+                .addOnSuccessListener(executor) { labels ->
+                    onDetectionFinished(labels)
+                    Log.e("CameraMisha", "Все окей, ObjectDetectorProcessor работает")}
                 .addOnFailureListener(executor) { e: Exception ->
                     Log.e("Camera", "Error detecting face", e)
                 }

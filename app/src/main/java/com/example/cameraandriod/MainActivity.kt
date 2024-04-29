@@ -43,6 +43,7 @@ import com.example.cameraandriod.PoseDetectorProcessor
 import com.google.android.gms.tasks.TaskExecutors
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.common.MlKitException
+import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseLandmark
@@ -121,7 +122,7 @@ private fun CameraPreview(previewView: PreviewView){
         val lifecycleOwner = LocalLifecycleOwner.current
         val context = LocalContext.current
         var sourceInfo by remember { mutableStateOf(SourceInfo(10,10,false)) }
-        var detectedObject by remember { mutableStateOf<ObjectDetection?>(null) }
+        var detectedObject by remember { mutableStateOf<List<DetectedObject>>(emptyList()) }
         var detectedPose by remember { mutableStateOf<Pose?>(null) }
         val previewView = remember { PreviewView(context) }
         val cameraProvider = remember(sourceInfo) {
@@ -130,7 +131,7 @@ private fun CameraPreview(previewView: PreviewView){
                 previewView, lifecycleOwner, cameraLens ,context,
                 setSourceInfo = {sourceInfo = it},
                 onObjectDetected = {detectedObject = it},
-                    onPoseDetected = { detectedPose = it }
+                onPoseDetected = { detectedPose = it }
             )
         }
         BoxWithConstraints(
@@ -152,7 +153,7 @@ private fun CameraPreview(previewView: PreviewView){
                     )
                 ){
                     CameraPreview(previewView)
-                   // DetectedObject(detectedObjects = detectedObject, sourceInfo = sourceInfo )
+                    DetectedObject(detectedObjects = detectedObject, sourceInfo = sourceInfo )
                     DetectedPose(pose = detectedPose, sourceInfo = sourceInfo)
                 }
             }
@@ -165,7 +166,7 @@ private fun CameraPreview(previewView: PreviewView){
         cameraLens: Int,
         context: Context,
         setSourceInfo: (SourceInfo) -> Unit,
-        onObjectDetected:(ObjectDetection) -> Unit,
+        onObjectDetected:(List<DetectedObject>) -> Unit,
         onPoseDetected: (Pose) -> Unit
     ):ListenableFuture<ProcessCameraProvider> {
         addListener({
@@ -177,7 +178,7 @@ private fun CameraPreview(previewView: PreviewView){
                     setSurfaceProvider(previewView.surfaceProvider)
                 }
             val analysis =
-                bindAnalysisCase(cameraLens, setSourceInfo,/*onObjectDetected*/ onPoseDetected)
+                bindAnalysisCase(cameraLens, setSourceInfo,onObjectDetected, onPoseDetected)
             try {
                 get().apply {
                     unbindAll()
@@ -193,7 +194,7 @@ private fun CameraPreview(previewView: PreviewView){
     private fun bindAnalysisCase(
         lens:Int,
         setSourceInfo: (SourceInfo) -> Unit,
-        //onObjectDetected: (ObjectDetection) -> Unit,
+        onObjectDetected: (List<DetectedObject>) -> Unit,
         onPoseDetected: (Pose) -> Unit
     ):ImageAnalysis? {
 
@@ -201,14 +202,14 @@ private fun CameraPreview(previewView: PreviewView){
             Log.e("CameraMisha", "Все окей, Pose detector работает")
             PoseDetectorProcessor()
         } catch (e: Exception){
-            Log.e("CameraMisha", "Can not create object processor", e)
+            Log.e("CameraMisha", "Can not create pose processor", e)
             return null
         }
         val detectProcessor = try {
-            Log.e("CameraMisha", "Все окей, Pose detector работает")
+            Log.e("CameraMisha", "Все окей, Object detector работает")
             DetectedObjectProcessor()
         } catch (e: Exception){
-            Log.e("CameraMisha", "Can not create object processor", e)
+            Log.e("CameraMisha", "Can not create object detector processor", e)
             return null
         }
         val builder = ImageAnalysis.Builder()
@@ -226,10 +227,18 @@ private fun CameraPreview(previewView: PreviewView){
             }
             try {
                 Log.e("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
-               // detectProcessor.processImageProxy(imageProxy, onObjectDetected)
+                //detectProcessor.processImageProxy(imageProxy, onObjectDetected)
                 poseProcessor.processImageProxy(imageProxy, onPoseDetected)
             } catch (e: MlKitException) {
-                Log.e("CameraMisha", "Failed to process image. Error: " + e.localizedMessage)
+                Log.e("CameraMisha", "Failed to process image on Pose Detector. Error: " + e.localizedMessage)
+            }
+            try {
+                Log.e("CameraMisha", "Все окей, ObjectDetector.ProcessImageProxy работает")
+                detectProcessor.processImageProxy(imageProxy, onObjectDetected)
+
+               // poseProcessor.processImageProxy(imageProxy, onPoseDetected)
+            } catch (e: MlKitException) {
+                Log.e("CameraMisha", "Failed to process image on Detector Object. Error: " + e.localizedMessage)
             }
         }
         return analysisUseCase
@@ -319,9 +328,9 @@ private fun CameraPreview(previewView: PreviewView){
             }
         }
     }
-   /* @Composable
+    @Composable
     fun DetectedObject(
-        detectedObject: ObjectDetection,
+        detectedObjects: List<DetectedObject>,
         sourceInfo: SourceInfo
     ){
         Canvas(modifier = Modifier.fillMaxSize()){
@@ -337,7 +346,7 @@ private fun CameraPreview(previewView: PreviewView){
         }
 
         }
-    }*/
+    }
 private fun obtainSourceInfo(lens: Int, imageProxy: ImageProxy): SourceInfo {
     val isImageFlipped = lens == CameraSelector.LENS_FACING_FRONT
     val rotationDegrees = imageProxy.imageInfo.rotationDegrees
@@ -375,4 +384,4 @@ private enum class PreviewScaleType {
     FIT_CENTER,
     CENTER_CROP
 }
-}
+
