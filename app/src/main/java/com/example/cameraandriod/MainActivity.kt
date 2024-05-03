@@ -1,9 +1,7 @@
 package com.example.cameraandriod;
-import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Paint
-import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
@@ -20,10 +18,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,6 +58,8 @@ import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseLandmark
+import java.lang.Math.max
+import java.lang.Math.min
 
 @ExperimentalGetImage class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -139,8 +136,6 @@ import com.google.mlkit.vision.pose.PoseLandmark
         modifier: Modifier = Modifier,
         cameraLens: Int
     ) {
-
-
         val lifecycleOwner = LocalLifecycleOwner.current
         val context = LocalContext.current
         var sourceInfo by remember { mutableStateOf(SourceInfo(10, 10, false)) }
@@ -153,7 +148,8 @@ import com.google.mlkit.vision.pose.PoseLandmark
                     previewView, lifecycleOwner, cameraLens, context,
                     setSourceInfo = { sourceInfo = it },
                     onObjectDetected = { detectedObject = it },
-                    onPoseDetected = { detectedPose = it }
+                    onPoseDetected = { detectedPose = it },
+                    //onSitDown = { detectedSitDown = it }
                 )
         }
         BoxWithConstraints(
@@ -178,6 +174,8 @@ import com.google.mlkit.vision.pose.PoseLandmark
                     CameraPreview(previewView)
                     DetectedObject(detectedObjects = detectedObject, sourceInfo = sourceInfo)
                     DetectedPose(pose = detectedPose, sourceInfo = sourceInfo)
+                    poseSitDownAnalyzer(pose = detectedPose)
+                    poseLeaningForward(pose = detectedPose)
                 }
             }
         }
@@ -190,7 +188,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
         context: Context,
         setSourceInfo: (SourceInfo) -> Unit,
         onObjectDetected: (List<DetectedObject>) -> Unit,
-        onPoseDetected: (Pose) -> Unit
+        onPoseDetected: (Pose) -> Unit,
     ): ListenableFuture<ProcessCameraProvider> {
         addListener({
             val cameraSelector = CameraSelector.Builder().requireLensFacing(cameraLens).build()
@@ -201,7 +199,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
                     setSurfaceProvider(previewView.surfaceProvider)
                 }
             val analysis =
-                bindAnalysisCase(cameraLens, setSourceInfo, onObjectDetected, onPoseDetected)
+                bindAnalysisCase(cameraLens, setSourceInfo, onObjectDetected, onPoseDetected/*, onSitDown*/)
             try {
                 get().apply {
                     unbindAll()
@@ -219,7 +217,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
         lens: Int,
         setSourceInfo: (SourceInfo) -> Unit,
         onObjectDetected: (List<DetectedObject>) -> Unit,
-        onPoseDetected: (Pose) -> Unit
+        onPoseDetected: (Pose) -> Unit,
     ): ImageAnalysis? {
 
         val poseProcessor = try {
@@ -245,13 +243,12 @@ import com.google.mlkit.vision.pose.PoseLandmark
             TaskExecutors.MAIN_THREAD
         ) { imageProxy: ImageProxy ->
             if (!sourceInfoUpdater) {
-                Log.e("CameraMisha", "Все окей, Pose detector работает")
+                Log.e("CameraMisha", "SourceInfo работает")
                 setSourceInfo(obtainSourceInfo(lens, imageProxy))
                 sourceInfoUpdater = true
             }
             try {
                 Log.e("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
-                //detectProcessor.processImageProxy(imageProxy, onObjectDetected)
                 poseProcessor.processImageProxy(imageProxy, onPoseDetected)
             } catch (e: MlKitException) {
                 Log.e(
@@ -262,18 +259,67 @@ import com.google.mlkit.vision.pose.PoseLandmark
             try {
                 Log.e("CameraMisha", "Все окей, ObjectDetector.ProcessImageProxy работает")
                 detectProcessor.processImageProxy(imageProxy, onObjectDetected)
-
-                // poseProcessor.processImageProxy(imageProxy, onPoseDetected)
             } catch (e: MlKitException) {
                 Log.e(
                     "CameraMisha",
                     "Failed to process image on Detector Object. Error: " + e.localizedMessage
                 )
             }
+            try {
+                Log.e("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
+                //sitDownProcessor.poseAnalyzer(imageProxy, onSitDown)
+            } catch (e: MlKitException) {
+                Log.e(
+                    "CameraMisha",
+                    "Failed to process image on sitDownProcessor. Error: " + e.localizedMessage
+                )
+            }
         }
         return analysisUseCase
     }
+    fun getAngle(firstPoint: PoseLandmark?, midPoint: PoseLandmark?, lastPoint: PoseLandmark?): Double{
+        if (lastPoint != null && midPoint != null && firstPoint != null){
+        var result = Math.toDegrees(
+            Math.atan2(
+                lastPoint.position.y.toDouble() - midPoint.position.y.toDouble(),
+                lastPoint.position.x.toDouble() - midPoint.position.x.toDouble()
+            )
+                    - Math.atan2(
+                firstPoint.position.y.toDouble() - midPoint.position.y.toDouble(),
+                firstPoint.position.x.toDouble() - midPoint.position.x.toDouble()
+            )
+        )
+        result = Math.abs(result) // Angle should never be negative
+        if (result > 180) {
+            result = 360.0 - result // Always get the acute representation of the angle
+        }
+        return result
+        }
+        return 0.0
+    }
+    fun poseSitDownAnalyzer(pose: Pose?){
+        if (pose != null){
+            val angle = getAngle(pose.getPoseLandmark(PoseLandmark.LEFT_HIP),
+                pose.getPoseLandmark(PoseLandmark.LEFT_KNEE),
+                pose.getPoseLandmark(PoseLandmark.LEFT_ANKLE))
+            if (angle>40 && angle<140){
+                Log.d("CameraMishaPoseDetector", "Человевек сел!")
+            }
+        }
+    }
 
+    fun poseLeaningForward(pose: Pose?){
+        if (pose != null){
+            val nose = pose.getPoseLandmark(PoseLandmark.NOSE)
+            val leftShoulder = pose.getPoseLandmark(PoseLandmark.LEFT_SHOULDER)
+            val leftHip = pose.getPoseLandmark(PoseLandmark.LEFT_HIP)
+            val rightHip = pose.getPoseLandmark(PoseLandmark.RIGHT_HIP)
+            val angle = getAngle(leftShoulder, nose, leftHip) + getAngle(leftShoulder, nose, rightHip)
+            if (angle>160){
+                Log.d("CameraMishaPoseDetector", "Человевек наклонился!")
+            }
+        }
+    }
     @Composable
     fun DetectedPose(
         pose: Pose?,

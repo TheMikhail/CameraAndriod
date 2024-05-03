@@ -11,7 +11,7 @@ android {
        // applicationId = "com.google.mlkit.vision.demo"
         applicationId = "com.example.cameraandriod"
         minSdk = 24
-        targetSdk = 33
+        targetSdk = 31
         versionCode = 1
         versionName = "1.0"
 
@@ -53,6 +53,8 @@ android {
 dependencies {
     implementation("com.google.mlkit:object-detection-custom:17.0.1")
     implementation("com.google.firebase:protolite-well-known-types:18.0.0")
+    //implementation("androidx.privacysandbox.tools:tools-core:1.0.0-alpha08")
+   // implementation("com.google.firebase:firebase-crashlytics-buildtools:2.9.9")
     val camerax_version = "1.3.3"
     implementation("androidx.camera:camera-camera2:$camerax_version")
     implementation("androidx.camera:camera-lifecycle:$camerax_version")
