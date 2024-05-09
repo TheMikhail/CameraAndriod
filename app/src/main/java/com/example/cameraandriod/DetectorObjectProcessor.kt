@@ -1,7 +1,6 @@
 package com.example.cameraandriod
 
 import android.annotation.SuppressLint
-import android.content.ContentValues.TAG
 import android.util.Log
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageProxy
@@ -25,25 +24,11 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
                 .enableMultipleObjects()
                 .enableClassification()
                 .build()
-
             detector = ObjectDetection.getClient(objectDetectorOptions)
         }
 
         fun stop(){
             detector.close()
-        }
-        private fun debugPrint(detectedObjects: List<DetectedObject>) {
-            detectedObjects.forEachIndexed { index, detectedObject ->
-                val box = detectedObject.boundingBox
-
-                Log.d(TAG, "Detected object: $index")
-                Log.d(TAG, " trackingId: ${detectedObject.trackingId}")
-                Log.d(TAG, " boundingBox: (${box.left}, ${box.top}) - (${box.right},${box.bottom})")
-                detectedObject.labels.forEach {
-                    Log.d(TAG, " categories: ${it.text}")
-                    Log.d(TAG, " confidence: ${it.confidence}")
-                }
-            }
         }
         @SuppressLint("UnsafeExperimentalUsageError")
         fun processImageProxy(image: ImageProxy, onDetectionFinished: (List<DetectedObject>) -> Unit){
