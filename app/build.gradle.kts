@@ -8,7 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-       // applicationId = "com.google.mlkit.vision.demo"
+        applicationId = "com.google.mlkit.vision.demo"
         applicationId = "com.example.cameraandriod"
         minSdk = 24
         targetSdk = 31
@@ -51,6 +51,8 @@ android {
 }
 
 dependencies {
+    implementation("com.google.mlkit:face-detection:16.1.6")
+    implementation("com.google.android.gms:play-services-mlkit-face-detection:17.1.0")
     implementation("com.google.mlkit:object-detection-custom:17.0.1")
     implementation("com.google.firebase:protolite-well-known-types:18.0.0")
     val camerax_version = "1.3.3"

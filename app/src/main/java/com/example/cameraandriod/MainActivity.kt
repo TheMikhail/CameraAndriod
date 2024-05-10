@@ -1,7 +1,9 @@
 package com.example.cameraandriod;
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Bundle
 import android.util.Log
@@ -22,6 +24,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -37,8 +40,10 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -49,12 +54,15 @@ import com.google.android.gms.tasks.TaskExecutors
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.common.MlKitException
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.label.ImageLabel
 import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseLandmark
+import java.util.Locale
+import kotlin.math.roundToInt
 
 @ExperimentalGetImage class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -133,6 +141,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
         val lifecycleOwner = LocalLifecycleOwner.current
         val context = LocalContext.current
         var sourceInfo by remember { mutableStateOf(SourceInfo(10, 10, false)) }
+        var detectedFaces by remember { mutableStateOf<List<Face>>(emptyList()) }
         var detectedObject by remember { mutableStateOf<List<DetectedObject>>(emptyList()) }
         var detectedPose by remember { mutableStateOf<Pose?>(null) }
         var labelDetected by remember { mutableStateOf<List<ImageLabel>>(emptyList()) }
@@ -145,6 +154,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
                     //onObjectDetected = { detectedObject = it },
                     onLabelDetector = {labelDetected = it},
                     onPoseDetected = { detectedPose = it },
+                    onFacesDetected = { detectedFaces = it },
                 )
         }
         BoxWithConstraints(
@@ -167,8 +177,9 @@ import com.google.mlkit.vision.pose.PoseLandmark
                         )
                 ) {
                     CameraPreview(previewView)
-                   // DetectedObject(detectedObjects = detectedObject, sourceInfo = sourceInfo)
+                    DetectedObject(labels = labelDetected, sourceInfo = sourceInfo)
                     DetectedPose(pose = detectedPose, sourceInfo = sourceInfo)
+                    DetectedFaces(faces = detectedFaces, sourceInfo = sourceInfo)
                     poseSitDownAnalyzer(pose = detectedPose)
                     poseLeaningForward(pose = detectedPose)
                 }
@@ -182,6 +193,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
         cameraLens: Int,
         context: Context,
         setSourceInfo: (SourceInfo) -> Unit,
+        onFacesDetected: (List<Face>) -> Unit,
       //  onObjectDetected: (List<DetectedObject>) -> Unit,
         onLabelDetector: (List<ImageLabel>) -> Unit,
         onPoseDetected: (Pose) -> Unit,
@@ -195,7 +207,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
                     setSurfaceProvider(previewView.surfaceProvider)
                 }
             val analysis =
-                bindAnalysisCase(cameraLens, setSourceInfo, onLabelDetector, /*onObjectDetected,*/ onPoseDetected)
+                bindAnalysisCase(cameraLens, setSourceInfo,onLabelDetector, /*onObjectDetected,*/ onPoseDetected, onFacesDetected)
             try {
                 get().apply {
                     unbindAll()
@@ -215,6 +227,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
        // onObjectDetected: (List<DetectedObject>) -> Unit,
         onLabelDetector: (List<ImageLabel>) -> Unit,
         onPoseDetected: (Pose) -> Unit,
+        onFacesDetected: (List<Face>) -> Unit
     ): ImageAnalysis? {
 
         val poseProcessor = try {
@@ -224,9 +237,9 @@ import com.google.mlkit.vision.pose.PoseLandmark
             Log.e("CameraMisha", "Can not create pose processor", e)
             return null
         }
-        val detectProcessor = try {
+        val faceProcessor = try {
             Log.e("CameraMisha", "Все окей, Object detector работает")
-            DetectedObjectProcessor()
+            FaceDetectorProcessor()
         } catch (e: Exception) {
             Log.e("CameraMisha", "Can not create object detector processor", e)
             return null
@@ -238,7 +251,13 @@ import com.google.mlkit.vision.pose.PoseLandmark
             Log.e("CameraMisha", "Can not create object detector processor", e)
             return null
         }
-
+        val detectProcessor = try {
+            Log.e("CameraMisha", "Все окей, Object detector работает")
+            DetectedObjectProcessor()
+        } catch (e: Exception) {
+            Log.e("CameraMisha", "Can not create object detector processor", e)
+            return null
+        }
         val builder = ImageAnalysis.Builder()
         val analysisUseCase = builder.build()
 
@@ -277,6 +296,15 @@ import com.google.mlkit.vision.pose.PoseLandmark
                 Log.e(
                     "CameraMisha",
                     "Failed to process image on sitDownProcessor. Error: " + e.localizedMessage
+                )
+            }
+            try {
+                Log.e("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
+                faceProcessor.processImageProxy(imageProxy, onFacesDetected)
+            } catch (e: MlKitException) {
+                Log.e(
+                    "CameraMisha",
+                    "Failed to process image on Pose Detector. Error: " + e.localizedMessage
                 )
             }
         }
@@ -410,47 +438,43 @@ import com.google.mlkit.vision.pose.PoseLandmark
             }
         }
     }
-
-   /* @Composable
+    @Composable
+    fun DetectedFaces(
+        faces: List<Face>,
+        sourceInfo: SourceInfo
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val needToMirror = sourceInfo.isImageFlipped
+            for (face in faces) {
+                val left =
+                    if (needToMirror) size.width - face.boundingBox.right.toFloat() else face.boundingBox.left.toFloat()
+                drawRect(
+                    Color.Gray, style = Stroke(2.dp.toPx()),
+                    topLeft = Offset(left, face.boundingBox.top.toFloat()),
+                    size = Size(face.boundingBox.width().toFloat(), face.boundingBox.height().toFloat())
+                )
+            }
+        }
+    }
+    @Composable
     fun DetectedObject(
         labels: List<ImageLabel>,
         sourceInfo: SourceInfo
     ) {
-        val paint = Paint().apply {
-            color = Color.Red.toArgb() // Цвет рамки и текста
-            style = Paint.Style.STROKE // Тип рисования: только контур
-            strokeWidth = 4f // Ширина контура
-            textSize = 24f // Размер шрифта
-        }
-        Box() {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val needToMirror = sourceInfo.isImageFlipped
-                for (label in labels) {
-                    val text = label.text
-                    val confidence = label.confidence
-                    val index = label.index
-                    val boundingBox = label.boundingBox
-                    val rectF = RectF(boundingBox)
-                    canvas.drawRect(
-                        boundingBox.left,
-                        boundingBox.top,
-                        boundingBox.right,
-                        boundingBox.bottom,
-                        paint
-                    )
-                    drawContext.canvas.nativeCanvas.drawText(
-                        text,
-                        detectedObject.boundingBox.left.toFloat(),
-                        detectedObject.boundingBox.top.toFloat() - 16F,  // Adjust the Y offset for the text placement
-                        Paint().apply {
-                            color = android.graphics.Color.RED
-                            textSize = 24f // Set the text size as needed
-                        }
-                    )
-                }
+        Column(Modifier.fillMaxSize().padding(start = 32.dp)) {
+            val needToMirror = sourceInfo.isImageFlipped
+            for (label in labels) {
+                val text = label.text
+                val confidence = label.confidence
+                val index = label.index
+                Text("Найден объект: ${text} / ${(confidence*100).roundToInt()}% $index"
+                    , modifier = Modifier.fillMaxWidth(0.8f), fontSize = 5.sp, maxLines = 2)
             }
         }
-    }*/
+    }
+}
+
+
 
     private fun obtainSourceInfo(lens: Int, imageProxy: ImageProxy): SourceInfo {
         val isImageFlipped = lens == CameraSelector.LENS_FACING_FRONT
@@ -482,7 +506,8 @@ import com.google.mlkit.vision.pose.PoseLandmark
             PreviewScaleType.CENTER_CROP -> kotlin.math.max(heightRatio, widthRatio)
         }
     }
-}
+
+
 data class SourceInfo(
     val width: Int,
     val height: Int,
