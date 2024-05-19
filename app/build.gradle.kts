@@ -6,7 +6,6 @@ plugins {
 android {
     namespace = "com.example.cameraandriod"
     compileSdk = 34
-
     defaultConfig {
         applicationId = "com.google.mlkit.vision.demo"
         applicationId = "com.example.cameraandriod"
@@ -55,6 +54,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-mlkit-face-detection:17.1.0")
     implementation("com.google.mlkit:object-detection-custom:17.0.1")
     implementation("com.google.firebase:protolite-well-known-types:18.0.0")
+    implementation("org.tensorflow:tensorflow-lite-metadata:0.1.0")
     val camerax_version = "1.3.3"
     implementation("androidx.camera:camera-camera2:$camerax_version")
     implementation("androidx.camera:camera-lifecycle:$camerax_version")
@@ -64,7 +64,7 @@ dependencies {
 // Icons
     val compose_version = "1.6.6"
     implementation("androidx.compose.material:material-icons-extended:$compose_version")
-
+    implementation ("com.google.mlkit:object-detection-custom:17.0.1")
     implementation("com.google.mlkit:object-detection:17.0.1")
 
     implementation("androidx.core:core-ktx:1.13.0")

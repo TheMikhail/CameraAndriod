@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraX
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -33,6 +34,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
@@ -151,7 +153,7 @@ import kotlin.math.roundToInt
                 .configureCamera(
                     previewView, lifecycleOwner, cameraLens, context,
                     setSourceInfo = { sourceInfo = it },
-                    //onObjectDetected = { detectedObject = it },
+                    onObjectDetected = { detectedObject = it },
                     onLabelDetector = {labelDetected = it},
                     onPoseDetected = { detectedPose = it },
                     onFacesDetected = { detectedFaces = it },
@@ -177,11 +179,14 @@ import kotlin.math.roundToInt
                         )
                 ) {
                     CameraPreview(previewView)
-                    DetectedObject(labels = labelDetected, sourceInfo = sourceInfo)
+                   // DetectedObjectLabels(labels = labelDetected, sourceInfo = sourceInfo)
                     DetectedPose(pose = detectedPose, sourceInfo = sourceInfo)
                     DetectedFaces(faces = detectedFaces, sourceInfo = sourceInfo)
+                    DetectedObject(detectedObjects = detectedObject, sourceInfo = sourceInfo)
                     poseSitDownAnalyzer(pose = detectedPose)
                     poseLeaningForward(pose = detectedPose)
+                    isHuman(labels = labelDetected)
+                    isCar(labels = labelDetected)
                 }
             }
         }
@@ -194,7 +199,7 @@ import kotlin.math.roundToInt
         context: Context,
         setSourceInfo: (SourceInfo) -> Unit,
         onFacesDetected: (List<Face>) -> Unit,
-      //  onObjectDetected: (List<DetectedObject>) -> Unit,
+        onObjectDetected: (List<DetectedObject>) -> Unit,
         onLabelDetector: (List<ImageLabel>) -> Unit,
         onPoseDetected: (Pose) -> Unit,
     ): ListenableFuture<ProcessCameraProvider> {
@@ -207,7 +212,7 @@ import kotlin.math.roundToInt
                     setSurfaceProvider(previewView.surfaceProvider)
                 }
             val analysis =
-                bindAnalysisCase(cameraLens, setSourceInfo,onLabelDetector, /*onObjectDetected,*/ onPoseDetected, onFacesDetected)
+                bindAnalysisCase(cameraLens, setSourceInfo,onObjectDetected/*,onLabelDetector*/,  onPoseDetected, onFacesDetected)
             try {
                 get().apply {
                     unbindAll()
@@ -224,38 +229,38 @@ import kotlin.math.roundToInt
     private fun bindAnalysisCase(
         lens: Int,
         setSourceInfo: (SourceInfo) -> Unit,
-       // onObjectDetected: (List<DetectedObject>) -> Unit,
-        onLabelDetector: (List<ImageLabel>) -> Unit,
+        onObjectDetected: (List<DetectedObject>) -> Unit,
+       // onLabelDetector: (List<ImageLabel>) -> Unit,
         onPoseDetected: (Pose) -> Unit,
         onFacesDetected: (List<Face>) -> Unit
     ): ImageAnalysis? {
 
         val poseProcessor = try {
-            Log.e("CameraMisha", "Все окей, Pose detector работает")
+            Log.d("CameraMisha", "Все окей, Pose detector работает")
             PoseDetectorProcessor()
         } catch (e: Exception) {
-            Log.e("CameraMisha", "Can not create pose processor", e)
+            Log.d("CameraMisha", "Can not create pose processor", e)
             return null
         }
         val faceProcessor = try {
-            Log.e("CameraMisha", "Все окей, Object detector работает")
+            Log.d("CameraMisha", "Все окей, Object detector работает")
             FaceDetectorProcessor()
         } catch (e: Exception) {
-            Log.e("CameraMisha", "Can not create object detector processor", e)
+            Log.d("CameraMisha", "Can not create object detector processor", e)
             return null
         }
         val labelProcessor = try {
-            Log.e("CameraMisha", "Все окей, Object detector работает")
+            Log.d("CameraMisha", "Все окей, Object detector работает")
             LabelObjectProcessor()
         } catch (e: Exception) {
-            Log.e("CameraMisha", "Can not create object detector processor", e)
+            Log.d("CameraMisha", "Can not create object detector processor", e)
             return null
         }
         val detectProcessor = try {
-            Log.e("CameraMisha", "Все окей, Object detector работает")
+            Log.d("CameraMisha", "Все окей, Object detector работает")
             DetectedObjectProcessor()
         } catch (e: Exception) {
-            Log.e("CameraMisha", "Can not create object detector processor", e)
+            Log.d("CameraMisha", "Can not create object detector processor", e)
             return null
         }
         val builder = ImageAnalysis.Builder()
@@ -267,42 +272,42 @@ import kotlin.math.roundToInt
             TaskExecutors.MAIN_THREAD
         ) { imageProxy: ImageProxy ->
             if (!sourceInfoUpdater) {
-                Log.e("CameraMisha", "SourceInfo работает")
+                Log.d("CameraMisha", "SourceInfo работает")
                 setSourceInfo(obtainSourceInfo(lens, imageProxy))
                 sourceInfoUpdater = true
             }
             try {
-                Log.e("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
+                Log.d("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
                 poseProcessor.processImageProxy(imageProxy, onPoseDetected)
             } catch (e: MlKitException) {
-                Log.e(
+                Log.d(
                     "CameraMisha",
                     "Failed to process image on Pose Detector. Error: " + e.localizedMessage
                 )
             }
             try {
-                Log.e("CameraMisha", "Все окей, ObjectDetector.ProcessImageProxy работает")
-                //detectProcessor.processImageProxy(imageProxy, onObjectDetected)
+                Log.d("CameraMisha", "Все окей, ObjectDetector.ProcessImageProxy работает")
+                detectProcessor.processImageProxy(imageProxy, onObjectDetected)
             } catch (e: MlKitException) {
-                Log.e(
+                Log.d(
                     "CameraMisha",
                     "Failed to process image on Detector Object. Error: " + e.localizedMessage
                 )
             }
             try {
-                Log.e("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
-                labelProcessor.processImageProxy(imageProxy, onLabelDetector)
+                Log.d("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
+               // labelProcessor.processImageProxy(imageProxy, onLabelDetector)
             } catch (e: MlKitException) {
-                Log.e(
+                Log.d(
                     "CameraMisha",
                     "Failed to process image on sitDownProcessor. Error: " + e.localizedMessage
                 )
             }
             try {
-                Log.e("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
+                Log.d("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
                 faceProcessor.processImageProxy(imageProxy, onFacesDetected)
             } catch (e: MlKitException) {
-                Log.e(
+                Log.d(
                     "CameraMisha",
                     "Failed to process image on Pose Detector. Error: " + e.localizedMessage
                 )
@@ -445,7 +450,9 @@ import kotlin.math.roundToInt
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val needToMirror = sourceInfo.isImageFlipped
+
             for (face in faces) {
+                Log.d("CameraMishaFace", "человек: ${face.trackingId}")
                 val left =
                     if (needToMirror) size.width - face.boundingBox.right.toFloat() else face.boundingBox.left.toFloat()
                 drawRect(
@@ -456,12 +463,89 @@ import kotlin.math.roundToInt
             }
         }
     }
+    /*@Composable
+    fun DetectedObject(
+        detectedObjects: List<DetectedObject>,
+        sourceInfo: SourceInfo
+    ) {
+        Box() {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawRect(Color.Transparent, style = Fill)
+                val needToMirror = sourceInfo.isImageFlipped
+                // Предположим, что у нас есть переменные для координат объекта
+                for (detectedObject in detectedObjects){
+                    val objectX = detectedObject.boundingBox.left.toFloat()
+                    val objectY = detectedObject.boundingBox.top.toFloat()
+                    val objectWidth = detectedObject.boundingBox.width().toFloat()
+                    val objectHeight = detectedObject.boundingBox.height().toFloat()
+                    // Отрисовка рамки вокруг объекта
+                    drawRect(color = Color.Blue, topLeft = Offset(objectX, objectY), size = Size(objectWidth, objectHeight), style = Stroke(width = 2f))
+
+                    // Подпись названия объекта
+                    val objectName = detectedObject.labels.joinToString {
+                        it.text
+                    }
+                    val textOffsetX = objectX + objectWidth / 2
+                    val textOffsetY = objectY + objectHeight + 20f
+                    drawIntoCanvas {
+                        it.nativeCanvas.drawText(objectName, textOffsetX, textOffsetY, Paint().apply {
+                            color = Color.Black.toArgb()
+                            textSize = 24f
+                        })
+                    }
+                }
+
+
+
+            }
+        }
+    }*/
     @Composable
     fun DetectedObject(
+        detectedObjects: List<DetectedObject>,
+        sourceInfo: SourceInfo
+    ) {
+        Box() {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val needToMirror = sourceInfo.isImageFlipped
+
+                for (detectedObject in detectedObjects) {
+                    drawRect(
+                        Color.Red, style = Stroke(1.dp.toPx()),
+                        topLeft = Offset(
+                            detectedObject.boundingBox.left.toFloat(),
+                            detectedObject.boundingBox.top.toFloat()
+                        ),
+                        size = Size(
+                            detectedObject.boundingBox.width().toFloat(),
+                            detectedObject.boundingBox.height().toFloat()
+                        )
+                    )
+                    val text = detectedObject.labels.joinToString {
+                        it.text
+                    }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        text,
+                        detectedObject.boundingBox.left.toFloat(),
+                        detectedObject.boundingBox.top.toFloat() - 16F,  // Adjust the Y offset for the text placement
+                        Paint().apply {
+                            color = android.graphics.Color.RED
+                            textSize = 24f // Set the text size as needed
+                        }
+                    )
+                }
+            }
+        }
+    }
+    /*@Composable
+    fun DetectedObjectLabels(
         labels: List<ImageLabel>,
         sourceInfo: SourceInfo
     ) {
-        Column(Modifier.fillMaxSize().padding(start = 32.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(start = 32.dp)) {
             val needToMirror = sourceInfo.isImageFlipped
             for (label in labels) {
                 val text = label.text
@@ -471,10 +555,40 @@ import kotlin.math.roundToInt
                     , modifier = Modifier.fillMaxWidth(0.8f), fontSize = 5.sp, maxLines = 2)
             }
         }
-    }
+    }*/
 }
+fun distanceBetweenObjects(detectedObjects: List<DetectedObject>):Boolean{
 
+    for (detectedObject in detectedObjects) {
+        val boundingBox = detectedObject.boundingBox
+        val trackingId = detectedObject.trackingId
+        for (label in detectedObject.labels) {
+            val text = label.text
+            val index = label.index
+            val confidence = label.confidence
+        }
+    }
 
+    return false
+}
+fun isCar(labels: List<ImageLabel>):Boolean{
+    for (label in labels){
+        if(label.text == "Car"||label.text == "Vehicle"){
+            Log.d("CameraMishaLabelIs", "Обнаружена машина")
+            return true
+        }
+    }
+    return false
+}
+fun isHuman(labels: List<ImageLabel>):Boolean {
+    for (label in labels){
+        if (label.text == "Hand" || label.text == "Skin"){
+            Log.d("CameraMishaLabelIs", "Обнаружен человек!")
+            return true
+        }
+    }
+    return false
+}
 
     private fun obtainSourceInfo(lens: Int, imageProxy: ImageProxy): SourceInfo {
         val isImageFlipped = lens == CameraSelector.LENS_FACING_FRONT
