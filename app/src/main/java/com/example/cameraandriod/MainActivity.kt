@@ -1,10 +1,11 @@
 package com.example.cameraandriod;
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Rect
-import android.graphics.RectF
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
@@ -23,9 +24,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -34,28 +40,29 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.example.cameraandriod.ui.theme.CameraAndriodTheme
-import com.example.cameraandriod.PoseDetectorProcessor
+import com.example.cameraandriod.ui.theme.notification.PushService
 import com.google.android.gms.tasks.TaskExecutors
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.mlkit.common.MlKitException
-import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.label.ImageLabel
 import com.google.mlkit.vision.objects.DetectedObject
@@ -63,8 +70,6 @@ import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseLandmark
-import java.util.Locale
-import kotlin.math.roundToInt
 
 @ExperimentalGetImage class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,9 +118,20 @@ import kotlin.math.roundToInt
                         mutableStateOf(CameraSelector.LENS_FACING_BACK)
                     }
                     CameraPreview(cameraLens = lens)
+                    val sharedPref : SharedPreferences
+                    sharedPref = getSharedPreferences("Phone number", Context.MODE_PRIVATE)
+                    val phoneNumber = remember { mutableStateOf("") }
+                    PhoneNumberScreen(phoneNumber)
+                    /*Button(onClick = { savePhoneNumber(phoneNumber.value) }) {
+                        Text("Save phone number")
+                    }*/
                 }
             }
         }
+    }
+
+    fun saveNumber(phoneNumber: String){
+
     }
 
     @Composable
@@ -330,6 +346,7 @@ import kotlin.math.roundToInt
         result = Math.abs(result) // Angle should never be negative
         if (result > 180) {
             result = 360.0 - result // Always get the acute representation of the angle
+            PushService().sendNotification(this)
         }
         return result
         }
@@ -557,6 +574,41 @@ import kotlin.math.roundToInt
         }
     }*/
 }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PhoneNumberScreen(phoneNumber: MutableState<String>){
+    val context = LocalContext.current
+    Column(modifier = Modifier.padding(16.dp)) {
+        TextField(
+            phoneNumber.value,
+            { phoneNumber.value = it },
+            textStyle = TextStyle(fontSize = 28.sp),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            label = { Text("Введите номер телефона") }
+        )
+        Button(
+            onClick = { savePhoneNumber(context, phoneNumber.value) },
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text("Сохранить номер")
+        }
+    }
+}
+private const val PHONE_PREFS_KEY = "phone_number"
+fun savePhoneNumber(context: Context, phoneNumber: String){
+    val sharedPreferences = context.getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+    val editor = sharedPreferences.edit()
+    editor.putString(PHONE_PREFS_KEY, phoneNumber)
+    editor.apply()
+    if (sharedPreferences.getString(PHONE_PREFS_KEY,"")!!.isNotEmpty()){
+        Log.d("SaveNumber","Телефон сохранен")
+    }
+}
+private fun getSavedPhoneNumber(context: Context): String? {
+    val sharedPreferences = context.getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getString(PHONE_PREFS_KEY, null)
+}
+
 fun distanceBetweenObjects(detectedObjects: List<DetectedObject>):Boolean{
 
     for (detectedObject in detectedObjects) {

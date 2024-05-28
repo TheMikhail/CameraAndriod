@@ -1,8 +1,6 @@
 package com.example.cameraandriod
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
-import android.graphics.ImageFormat
 import android.util.Log
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageProxy

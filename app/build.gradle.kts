@@ -50,6 +50,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.firebase:firebase-messaging-ktx:24.0.0")
     implementation("com.google.mlkit:face-detection:16.1.6")
     implementation("com.google.android.gms:play-services-mlkit-face-detection:17.1.0")
     implementation("com.google.mlkit:object-detection-custom:17.0.1")
