@@ -1,11 +1,9 @@
 package com.example.cameraandriod;
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Paint
-import android.os.Build
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
@@ -14,11 +12,14 @@ import androidx.compose.runtime.*
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.CameraX
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.CameraController
+import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,7 +29,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -47,29 +47,31 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
-import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.example.cameraandriod.ui.theme.CameraAndriodTheme
 import com.example.cameraandriod.ui.theme.notification.PushService
 import com.google.android.gms.tasks.TaskExecutors
 import com.google.common.util.concurrent.ListenableFuture
-import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.mlkit.common.MlKitException
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.label.ImageLabel
 import com.google.mlkit.vision.objects.DetectedObject
-import com.google.mlkit.vision.objects.ObjectDetection
-import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseLandmark
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Timer
 
 @ExperimentalGetImage class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,6 +88,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
             this,
             android.Manifest.permission.CAMERA
         )
+
     }
 
     private fun permissionGranted() = ContextCompat.checkSelfPermission(
@@ -109,7 +112,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
             }
         }
     }
-
+    private lateinit var imageCapture: ImageCapture
     private fun initView() {
         setContent {
             CameraAndriodTheme {
@@ -117,23 +120,17 @@ import com.google.mlkit.vision.pose.PoseLandmark
                     var lens by remember {
                         mutableStateOf(CameraSelector.LENS_FACING_BACK)
                     }
-                    CameraPreview(cameraLens = lens)
+                    CameraPreview(
+                        cameraLens = lens
+                    )
+
                     val sharedPref : SharedPreferences
                     sharedPref = getSharedPreferences("Phone number", Context.MODE_PRIVATE)
                     val phoneNumber = remember { mutableStateOf("") }
-                    PhoneNumberScreen(phoneNumber)
-                    /*Button(onClick = { savePhoneNumber(phoneNumber.value) }) {
-                        Text("Save phone number")
-                    }*/
                 }
             }
         }
     }
-
-    fun saveNumber(phoneNumber: String){
-
-    }
-
     @Composable
     private fun CameraPreview(previewView: PreviewView) {
         AndroidView(
@@ -164,6 +161,14 @@ import com.google.mlkit.vision.pose.PoseLandmark
         var detectedPose by remember { mutableStateOf<Pose?>(null) }
         var labelDetected by remember { mutableStateOf<List<ImageLabel>>(emptyList()) }
         val previewView = remember { PreviewView(context) }
+        val cameraController = remember { LifecycleCameraController(applicationContext).apply {
+            setEnabledUseCases(
+                CameraController.IMAGE_CAPTURE or
+                        CameraController.VIDEO_CAPTURE
+            )
+        }}
+       // val viewModel = viewModel<MainViewModel>()
+       // val bitmaps by viewModel.bitmaps.collectAsState()
         val cameraProvider = remember(sourceInfo) {
             ProcessCameraProvider.getInstance(context)
                 .configureCamera(
@@ -173,8 +178,10 @@ import com.google.mlkit.vision.pose.PoseLandmark
                     onLabelDetector = {labelDetected = it},
                     onPoseDetected = { detectedPose = it },
                     onFacesDetected = { detectedFaces = it },
+
                 )
         }
+
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -202,11 +209,41 @@ import com.google.mlkit.vision.pose.PoseLandmark
                     poseSitDownAnalyzer(pose = detectedPose)
                     poseLeaningForward(pose = detectedPose)
                     isHuman(labels = labelDetected)
-                    isCar(labels = labelDetected)
+                    isCar(detectedObjects = detectedObject)
                 }
             }
         }
     }
+fun recordingVideo(){
+    val name = "CameraX-recording-" +
+            SimpleDateFormat("1", Locale.US)
+                .format(System.currentTimeMillis()) + ".mp4"
+
+
+
+}
+    /*fun takePhoto(
+        controller: LifecycleCameraController,
+        onPhotoTaken: (Bitmap) -> Unit
+    ){
+        val imageProxy: ImageProxy
+        controller.takePicture(
+            ContextCompat.getMainExecutor(applicationContext),
+            object : ImageCapture.OnImageCapturedCallback(){
+                override fun onCaptureSuccess(image: ImageProxy){
+                    super.onCaptureSuccess(image)
+                    onPhotoTaken(image.toBitmap())
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    super.onError(exception)
+                    Log.e("TakePhoto", "Невозможно сохранить фото: ", exception)
+                }
+            }
+
+        )
+
+    }*/
 
     private fun ListenableFuture<ProcessCameraProvider>.configureCamera(
         previewView: PreviewView,
@@ -219,9 +256,9 @@ import com.google.mlkit.vision.pose.PoseLandmark
         onLabelDetector: (List<ImageLabel>) -> Unit,
         onPoseDetected: (Pose) -> Unit,
     ): ListenableFuture<ProcessCameraProvider> {
+
         addListener({
             val cameraSelector = CameraSelector.Builder().requireLensFacing(cameraLens).build()
-
             val preview = androidx.camera.core.Preview.Builder()
                 .build()
                 .apply {
@@ -229,11 +266,14 @@ import com.google.mlkit.vision.pose.PoseLandmark
                 }
             val analysis =
                 bindAnalysisCase(cameraLens, setSourceInfo,onObjectDetected/*,onLabelDetector*/,  onPoseDetected, onFacesDetected)
+            imageCapture = ImageCapture.Builder()
+                .build()
             try {
                 get().apply {
                     unbindAll()
                     bindToLifecycle(lifecycleOwner, cameraSelector, preview)
                     bindToLifecycle(lifecycleOwner, cameraSelector, analysis)
+                    bindToLifecycle(lifecycleOwner, cameraSelector, imageCapture)
                 }
             } catch (exc: Exception) {
                 TODO("process errors")
@@ -261,13 +301,6 @@ import com.google.mlkit.vision.pose.PoseLandmark
         val faceProcessor = try {
             Log.d("CameraMisha", "Все окей, Object detector работает")
             FaceDetectorProcessor()
-        } catch (e: Exception) {
-            Log.d("CameraMisha", "Can not create object detector processor", e)
-            return null
-        }
-        val labelProcessor = try {
-            Log.d("CameraMisha", "Все окей, Object detector работает")
-            LabelObjectProcessor()
         } catch (e: Exception) {
             Log.d("CameraMisha", "Can not create object detector processor", e)
             return null
@@ -312,15 +345,6 @@ import com.google.mlkit.vision.pose.PoseLandmark
             }
             try {
                 Log.d("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
-               // labelProcessor.processImageProxy(imageProxy, onLabelDetector)
-            } catch (e: MlKitException) {
-                Log.d(
-                    "CameraMisha",
-                    "Failed to process image on sitDownProcessor. Error: " + e.localizedMessage
-                )
-            }
-            try {
-                Log.d("CameraMisha", "Все окей, Posedetector.ProcessImageProxy работает")
                 faceProcessor.processImageProxy(imageProxy, onFacesDetected)
             } catch (e: MlKitException) {
                 Log.d(
@@ -331,6 +355,31 @@ import com.google.mlkit.vision.pose.PoseLandmark
         }
         return analysisUseCase
     }
+    private val executor = TaskExecutors.MAIN_THREAD
+    fun takePhoto() {
+        if (!::imageCapture.isInitialized) {
+            Log.e("Camera", "ImageCapture instance not initialized")
+            return
+        }
+
+        val file = File(externalMediaDirs.first(), "${System.currentTimeMillis()}.jpg")
+
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
+
+        imageCapture.takePicture(outputOptions,executor,
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                    val uri = Uri.fromFile(file)
+                    val msg = "Photo: $uri"
+                    Log.d("takePhoto", msg)
+
+                }
+                override fun onError(exception: ImageCaptureException) {
+                    Log.e("CameraX", "Photo capture failed: ${exception.message}", exception)
+                }
+            })
+    }
+
     fun getAngle(firstPoint: PoseLandmark?, midPoint: PoseLandmark?, lastPoint: PoseLandmark?): Double{
         if (lastPoint != null && midPoint != null && firstPoint != null){
         var result = Math.toDegrees(
@@ -346,23 +395,38 @@ import com.google.mlkit.vision.pose.PoseLandmark
         result = Math.abs(result) // Angle should never be negative
         if (result > 180) {
             result = 360.0 - result // Always get the acute representation of the angle
-            PushService().sendNotification(this)
+
         }
         return result
         }
         return 0.0
     }
+    private var timer = Timer()
+    fun startTakingPhotos() {
+        val scope = CoroutineScope(Dispatchers.Default)
+        scope.launch {
+            while(true){
+                delay(5000)
+                takePhoto()
+            }
+        }
+    }
+
     fun poseSitDownAnalyzer(pose: Pose?){
+        val message = "Человек сидит рядом с авто!"
+        val scope = CoroutineScope(Dispatchers.Default)
         if (pose != null){
             val angle = getAngle(pose.getPoseLandmark(PoseLandmark.LEFT_HIP),
                 pose.getPoseLandmark(PoseLandmark.LEFT_KNEE),
                 pose.getPoseLandmark(PoseLandmark.LEFT_ANKLE))
             if (angle>20 && angle<130){
                 Log.d("CameraMishaPoseDetector", "Человевек сел!")
+                PushService().sendNotification(this, message)
             }
         }
     }
     fun poseLeaningForward(pose: Pose?){
+        val message = "Человек смотрит в окно авто!"
         if (pose != null){
             val nose = pose.getPoseLandmark(PoseLandmark.NOSE)
             val leftShoulder = pose.getPoseLandmark(PoseLandmark.LEFT_SHOULDER)
@@ -372,6 +436,7 @@ import com.google.mlkit.vision.pose.PoseLandmark
             val angle = getAngle(leftShoulder, nose, leftHip) + getAngle(leftShoulder, nose, rightHip)
             if (angle < 160 && angle > 60){
                 Log.d("CameraMishaPoseDetector", "Человевек наклонился!")
+                PushService().sendNotification(this, message)
             }
         }
     }
@@ -623,9 +688,9 @@ fun distanceBetweenObjects(detectedObjects: List<DetectedObject>):Boolean{
 
     return false
 }
-fun isCar(labels: List<ImageLabel>):Boolean{
-    for (label in labels){
-        if(label.text == "Car"||label.text == "Vehicle"){
+fun isCar(detectedObjects: List<DetectedObject>):Boolean{
+    for (label in detectedObjects){
+        if(label.labels.joinToString{it.text} == "Car"||label.labels.joinToString{it.text} == "vehicle"){
             Log.d("CameraMishaLabelIs", "Обнаружена машина")
             return true
         }

@@ -18,7 +18,7 @@ class PushService {
         const val CHANNEL_NAME = "AndroidApp"
     }
 
-    fun sendNotification(context: Context) {
+    fun sendNotification(context: Context, message: String) {
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -34,7 +34,7 @@ class PushService {
             //.setSmallIcon(androidx.core.R.drawable.notification_icon_background)
             .setSmallIcon(R.drawable.img)
             .setContentTitle("Осторожно")
-            .setContentText("Подозрительный человек!")
+            .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
         notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())

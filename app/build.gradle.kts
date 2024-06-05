@@ -59,6 +59,8 @@ dependencies {
     val camerax_version = "1.3.3"
     implementation("androidx.camera:camera-camera2:$camerax_version")
     implementation("androidx.camera:camera-lifecycle:$camerax_version")
+    implementation ("androidx.camera:camera-core:$camerax_version")
+    implementation ("androidx.camera:camera-video:$camerax_version")
     implementation("androidx.camera:camera-view:1.4.0-alpha05")
     implementation("com.google.mlkit:pose-detection:18.0.0-beta4")
     implementation("com.google.mlkit:image-labeling:17.0.8")
@@ -75,6 +77,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation ("androidx.compose.runtime:runtime")
     implementation("androidx.compose.material3:material3")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
