@@ -31,7 +31,7 @@ import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
     fun processImageProxy(image: ImageProxy, onDetectionFinished: (Pose) -> Unit) {
         detector.process(InputImage.fromMediaImage(image.image!!, image.imageInfo.rotationDegrees))
             .addOnSuccessListener(executor) { results: Pose -> onDetectionFinished(results)
-                Log.e("CameraMisha", "Все окей, PoseDetectorProcessor работает")}
+                Log.d("CameraMisha", "Все окей, PoseDetectorProcessor работает")}
             .addOnFailureListener(executor) { e: Exception ->
                 Log.e("CameraMisha", "Error detecting pose", e)
             }

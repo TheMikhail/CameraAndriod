@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.toLowerCase
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -159,7 +160,7 @@ import java.util.Timer
         var detectedFaces by remember { mutableStateOf<List<Face>>(emptyList()) }
         var detectedObject by remember { mutableStateOf<List<DetectedObject>>(emptyList()) }
         var detectedPose by remember { mutableStateOf<Pose?>(null) }
-        var labelDetected by remember { mutableStateOf<List<ImageLabel>>(emptyList()) }
+        var labelDetected by remember { mutableStateOf<List<DetectedObject>>(emptyList()) }
         val previewView = remember { PreviewView(context) }
         val cameraController = remember { LifecycleCameraController(applicationContext).apply {
             setEnabledUseCases(
@@ -175,7 +176,7 @@ import java.util.Timer
                     previewView, lifecycleOwner, cameraLens, context,
                     setSourceInfo = { sourceInfo = it },
                     onObjectDetected = { detectedObject = it },
-                    onLabelDetector = {labelDetected = it},
+                    //onLabelDetector = {detectedObject = it},
                     onPoseDetected = { detectedPose = it },
                     onFacesDetected = { detectedFaces = it },
 
@@ -208,8 +209,18 @@ import java.util.Timer
                     DetectedObject(detectedObjects = detectedObject, sourceInfo = sourceInfo)
                     poseSitDownAnalyzer(pose = detectedPose)
                     poseLeaningForward(pose = detectedPose)
-                    isHuman(labels = labelDetected)
+                    isHumans(detectedObjects = detectedObject)
                     isCar(detectedObjects = detectedObject)
+
+                    if (poseLeaningForward(detectedPose)&& isHumans(detectedObject) && isCar(detectedObject)){
+                        PushService().sendNotification(context, "Человек смотрит в окно!")
+                        takePhoto()
+                    }
+                    else if(poseSitDownAnalyzer(detectedPose)&& isHumans(detectedObject) && isCar(detectedObject)){
+                        PushService().sendNotification(context, "Человек сидит у авто!")
+                        takePhoto()
+                    }
+
                 }
             }
         }
@@ -253,7 +264,7 @@ fun recordingVideo(){
         setSourceInfo: (SourceInfo) -> Unit,
         onFacesDetected: (List<Face>) -> Unit,
         onObjectDetected: (List<DetectedObject>) -> Unit,
-        onLabelDetector: (List<ImageLabel>) -> Unit,
+        //onLabelDetector: (List<ImageLabel>) -> Unit,
         onPoseDetected: (Pose) -> Unit,
     ): ListenableFuture<ProcessCameraProvider> {
 
@@ -286,7 +297,6 @@ fun recordingVideo(){
         lens: Int,
         setSourceInfo: (SourceInfo) -> Unit,
         onObjectDetected: (List<DetectedObject>) -> Unit,
-       // onLabelDetector: (List<ImageLabel>) -> Unit,
         onPoseDetected: (Pose) -> Unit,
         onFacesDetected: (List<Face>) -> Unit
     ): ImageAnalysis? {
@@ -412,7 +422,7 @@ fun recordingVideo(){
         }
     }
 
-    fun poseSitDownAnalyzer(pose: Pose?){
+    fun poseSitDownAnalyzer(pose: Pose?):Boolean{
         val message = "Человек сидит рядом с авто!"
         val scope = CoroutineScope(Dispatchers.Default)
         if (pose != null){
@@ -421,11 +431,13 @@ fun recordingVideo(){
                 pose.getPoseLandmark(PoseLandmark.LEFT_ANKLE))
             if (angle>20 && angle<130){
                 Log.d("CameraMishaPoseDetector", "Человевек сел!")
-                PushService().sendNotification(this, message)
+                return true
             }
         }
+        return false
     }
-    fun poseLeaningForward(pose: Pose?){
+
+    fun poseLeaningForward(pose: Pose?):Boolean{
         val message = "Человек смотрит в окно авто!"
         if (pose != null){
             val nose = pose.getPoseLandmark(PoseLandmark.NOSE)
@@ -436,9 +448,10 @@ fun recordingVideo(){
             val angle = getAngle(leftShoulder, nose, leftHip) + getAngle(leftShoulder, nose, rightHip)
             if (angle < 160 && angle > 60){
                 Log.d("CameraMishaPoseDetector", "Человевек наклонился!")
-                PushService().sendNotification(this, message)
+                return true
             }
         }
+        return false
     }
     @Composable
     fun DetectedPose(
@@ -532,7 +545,6 @@ fun recordingVideo(){
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val needToMirror = sourceInfo.isImageFlipped
-
             for (face in faces) {
                 Log.d("CameraMishaFace", "человек: ${face.trackingId}")
                 val left =
@@ -542,46 +554,14 @@ fun recordingVideo(){
                     topLeft = Offset(left, face.boundingBox.top.toFloat()),
                     size = Size(face.boundingBox.width().toFloat(), face.boundingBox.height().toFloat())
                 )
+                if (face.trackingId != null){
+                    //takePhoto()
+                }
             }
+
         }
     }
-    /*@Composable
-    fun DetectedObject(
-        detectedObjects: List<DetectedObject>,
-        sourceInfo: SourceInfo
-    ) {
-        Box() {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawRect(Color.Transparent, style = Fill)
-                val needToMirror = sourceInfo.isImageFlipped
-                // Предположим, что у нас есть переменные для координат объекта
-                for (detectedObject in detectedObjects){
-                    val objectX = detectedObject.boundingBox.left.toFloat()
-                    val objectY = detectedObject.boundingBox.top.toFloat()
-                    val objectWidth = detectedObject.boundingBox.width().toFloat()
-                    val objectHeight = detectedObject.boundingBox.height().toFloat()
-                    // Отрисовка рамки вокруг объекта
-                    drawRect(color = Color.Blue, topLeft = Offset(objectX, objectY), size = Size(objectWidth, objectHeight), style = Stroke(width = 2f))
 
-                    // Подпись названия объекта
-                    val objectName = detectedObject.labels.joinToString {
-                        it.text
-                    }
-                    val textOffsetX = objectX + objectWidth / 2
-                    val textOffsetY = objectY + objectHeight + 20f
-                    drawIntoCanvas {
-                        it.nativeCanvas.drawText(objectName, textOffsetX, textOffsetY, Paint().apply {
-                            color = Color.Black.toArgb()
-                            textSize = 24f
-                        })
-                    }
-                }
-
-
-
-            }
-        }
-    }*/
     @Composable
     fun DetectedObject(
         detectedObjects: List<DetectedObject>,
@@ -592,6 +572,7 @@ fun recordingVideo(){
                 val needToMirror = sourceInfo.isImageFlipped
 
                 for (detectedObject in detectedObjects) {
+
                     drawRect(
                         Color.Red, style = Stroke(1.dp.toPx()),
                         topLeft = Offset(
@@ -606,6 +587,7 @@ fun recordingVideo(){
                     val text = detectedObject.labels.joinToString {
                         it.text
                     }
+                    Log.d("ObjCam","${text}")
                     drawContext.canvas.nativeCanvas.drawText(
                         text,
                         detectedObject.boundingBox.left.toFloat(),
@@ -619,25 +601,6 @@ fun recordingVideo(){
             }
         }
     }
-    /*@Composable
-    fun DetectedObjectLabels(
-        labels: List<ImageLabel>,
-        sourceInfo: SourceInfo
-    ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(start = 32.dp)) {
-            val needToMirror = sourceInfo.isImageFlipped
-            for (label in labels) {
-                val text = label.text
-                val confidence = label.confidence
-                val index = label.index
-                Text("Найден объект: ${text} / ${(confidence*100).roundToInt()}% $index"
-                    , modifier = Modifier.fillMaxWidth(0.8f), fontSize = 5.sp, maxLines = 2)
-            }
-        }
-    }*/
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -673,33 +636,23 @@ private fun getSavedPhoneNumber(context: Context): String? {
     val sharedPreferences = context.getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
     return sharedPreferences.getString(PHONE_PREFS_KEY, null)
 }
-
-fun distanceBetweenObjects(detectedObjects: List<DetectedObject>):Boolean{
-
-    for (detectedObject in detectedObjects) {
-        val boundingBox = detectedObject.boundingBox
-        val trackingId = detectedObject.trackingId
-        for (label in detectedObject.labels) {
-            val text = label.text
-            val index = label.index
-            val confidence = label.confidence
-        }
-    }
-
-    return false
-}
 fun isCar(detectedObjects: List<DetectedObject>):Boolean{
     for (label in detectedObjects){
-        if(label.labels.joinToString{it.text} == "Car"||label.labels.joinToString{it.text} == "vehicle"){
-            Log.d("CameraMishaLabelIs", "Обнаружена машина")
+        val text = label.labels.joinToString { it.text.toLowerCase() }
+        val humanText = Car().car.map { it.toLowerCase() }.toSet()
+
+        if (humanText.any { text.contains(it) }){
+            Log.d("CameraMishaLabelIs", "Обнаружена машина!")
             return true
         }
     }
     return false
 }
-fun isHuman(labels: List<ImageLabel>):Boolean {
-    for (label in labels){
-        if (label.text == "Hand" || label.text == "Skin"){
+fun isHumans(detectedObjects: List<DetectedObject>):Boolean {
+    for (label in detectedObjects){
+        val text = label.labels.joinToString { it.text.toLowerCase() }
+        val humanText = Human().human.map { it.toLowerCase() }.toSet()
+        if (humanText.any { text.contains(it) }){
             Log.d("CameraMishaLabelIs", "Обнаружен человек!")
             return true
         }
@@ -737,7 +690,6 @@ fun isHuman(labels: List<ImageLabel>):Boolean {
             PreviewScaleType.CENTER_CROP -> kotlin.math.max(heightRatio, widthRatio)
         }
     }
-
 
 data class SourceInfo(
     val width: Int,

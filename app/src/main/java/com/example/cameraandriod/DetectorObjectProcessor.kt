@@ -28,7 +28,7 @@ import java.nio.ByteBuffer
                 .setDetectorMode(CustomObjectDetectorOptions.STREAM_MODE)
                 .enableMultipleObjects()
                 .enableClassification()
-                .setClassificationConfidenceThreshold(0.5f)
+                .setClassificationConfidenceThreshold(0.98f)
                 .build()
 
             detector = ObjectDetection.getClient(customObjectDetectorOptions)
@@ -44,21 +44,10 @@ import java.nio.ByteBuffer
             detector.process(InputImage.fromMediaImage(image.image!!, image.imageInfo.rotationDegrees))
                 .addOnSuccessListener(executor) { labels ->
                     onDetectionFinished(labels)
-                    Log.e("CameraMisha", "Все окей, ObjectDetectorProcessor работает")
-                    /*for (label in labels){
-                        for (lab in label.labels ){
-                        val text = lab.text
-                        val confidence = lab.confidence
-                        val index = lab.index
-                            Log.d("DetectObj", text)
-                            Log.d("DetectObj", confidence.toString())
-                            Log.d("DetectObj", index.toString())
-                        }
-                    }*/
-
+                    Log.d("CameraMisha", "Все окей, ObjectDetectorProcessor работает")
                 }
                 .addOnFailureListener(executor) { e: Exception ->
-                    Log.e("Camera", "Error detecting face", e)
+                    Log.e("CameraObject", "Error detecting face", e)
                 }
                 .addOnCompleteListener { image.close() }
         }
