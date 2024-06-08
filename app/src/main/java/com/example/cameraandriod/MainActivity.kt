@@ -640,7 +640,6 @@ fun isCar(detectedObjects: List<DetectedObject>):Boolean{
     for (label in detectedObjects){
         val text = label.labels.joinToString { it.text.toLowerCase() }
         val humanText = Car().car.map { it.toLowerCase() }.toSet()
-
         if (humanText.any { text.contains(it) }){
             Log.d("CameraMishaLabelIs", "Обнаружена машина!")
             return true
