@@ -55,6 +55,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.example.cameraandriod.ui.theme.CameraAndriodTheme
 import com.example.cameraandriod.ui.theme.notification.PushService
 import com.google.android.gms.tasks.TaskExecutors
@@ -68,6 +69,8 @@ import com.google.mlkit.vision.pose.PoseLandmark
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -75,8 +78,10 @@ import java.util.Locale
 import java.util.Timer
 
 @ExperimentalGetImage class MainActivity : ComponentActivity() {
+    private val repository = Repository()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        repository.events.onEach(::handleEvent).launchIn(lifecycleScope)
         if (permissionGranted()) {
             initView()
         } else {
@@ -209,18 +214,6 @@ import java.util.Timer
                     DetectedObject(detectedObjects = detectedObject, sourceInfo = sourceInfo)
                     poseSitDownAnalyzer(pose = detectedPose)
                     poseLeaningForward(pose = detectedPose)
-                    isHumans(detectedObjects = detectedObject)
-                    isCar(detectedObjects = detectedObject)
-
-                    if (poseLeaningForward(detectedPose)&& isHumans(detectedObject) && isCar(detectedObject)){
-                        PushService().sendNotification(context, "Человек смотрит в окно!")
-                        takePhoto()
-                    }
-                    else if(poseSitDownAnalyzer(detectedPose)&& isHumans(detectedObject) && isCar(detectedObject)){
-                        PushService().sendNotification(context, "Человек сидит у авто!")
-                        takePhoto()
-                    }
-
                 }
             }
         }
@@ -233,29 +226,24 @@ fun recordingVideo(){
 
 
 }
-    /*fun takePhoto(
-        controller: LifecycleCameraController,
-        onPhotoTaken: (Bitmap) -> Unit
-    ){
-        val imageProxy: ImageProxy
-        controller.takePicture(
-            ContextCompat.getMainExecutor(applicationContext),
-            object : ImageCapture.OnImageCapturedCallback(){
-                override fun onCaptureSuccess(image: ImageProxy){
-                    super.onCaptureSuccess(image)
-                    onPhotoTaken(image.toBitmap())
-                }
 
-                override fun onError(exception: ImageCaptureException) {
-                    super.onError(exception)
-                    Log.e("TakePhoto", "Невозможно сохранить фото: ", exception)
-                }
-            }
-
-        )
-
-    }*/
-
+    fun handleEvent(event: Event){
+        if (event == Event.HUMAN_SIT_DOWN){
+                takePhoto()
+                PushService().sendNotification(this, "Человек сидит у автомобиля!")
+        }
+        else if(event == Event.HUMAN_LEANING_FORWARD){
+            takePhoto()
+            PushService().sendNotification(this, "Человек смотрит в окно вашего авто!")
+        }
+        else if(event == Event.CAR_EMPTY){
+            PushService().sendNotification(this, "Машина уехала, надеюсь это Вы!")
+        }
+        else if(event == Event.CAR_PARKING){
+            PushService().sendNotification(this,"Машина приехала на место парковки!")
+        }
+        else event == Event.NONE
+    }
     private fun ListenableFuture<ProcessCameraProvider>.configureCamera(
         previewView: PreviewView,
         lifecycleOwner: LifecycleOwner,
@@ -410,16 +398,6 @@ fun recordingVideo(){
         return result
         }
         return 0.0
-    }
-    private var timer = Timer()
-    fun startTakingPhotos() {
-        val scope = CoroutineScope(Dispatchers.Default)
-        scope.launch {
-            while(true){
-                delay(5000)
-                takePhoto()
-            }
-        }
     }
 
     fun poseSitDownAnalyzer(pose: Pose?):Boolean{
