@@ -231,18 +231,25 @@ fun recordingVideo(){
         if (event == Event.HUMAN_SIT_DOWN){
                 takePhoto()
                 PushService().sendNotification(this, "Человек сидит у автомобиля!")
+            Log.d("State", "HandleEvent человек сидит у авто")
         }
         else if(event == Event.HUMAN_LEANING_FORWARD){
             takePhoto()
             PushService().sendNotification(this, "Человек смотрит в окно вашего авто!")
+            Log.d("State", "HandleEvent человек смотрит в окно вашего авто")
         }
         else if(event == Event.CAR_EMPTY){
             PushService().sendNotification(this, "Машина уехала, надеюсь это Вы!")
+            Log.d("State", "HandleEvent Машина уехала, надеюсь это Вы!")
         }
         else if(event == Event.CAR_PARKING){
             PushService().sendNotification(this,"Машина приехала на место парковки!")
+            Log.d("State", "HandleEvent Машина приехала на место парковки!")
         }
-        else event == Event.NONE
+        else {
+            event == Event.NONE
+        Log.d("State", "HandleEvent никакого события не происходит")
+        }
     }
     private fun ListenableFuture<ProcessCameraProvider>.configureCamera(
         previewView: PreviewView,
